@@ -12,16 +12,13 @@ jobs:
       - name: Enable Remote Desktop & Firewall
         shell: powershell
         run: |
-          # Enable RDP in registry
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
 
-          # Open Port 3389 in Windows Firewall
           netsh advfirewall firewall delete rule name="Allow-RDP"
           netsh advfirewall firewall add rule name="Allow-RDP" dir=in action=allow protocol=TCP localport=3389
 
-          # Restart service to ensure configuration loads
           Restart-Service -Name TermService -Force
 
       - name: Create Administrative User
@@ -29,30 +26,27 @@ jobs:
         run: |
           $Username = "CloudAdmin"
           $Password = "WinServer#2026!"
-          $SecurePassword = ConvertTo-SecureString$Password -AsPlainText -Force
+          
+          # Space fixed between command and argument
+          $SecurePassword = ConvertTo-SecureString -String$Password -AsPlainText -Force
 
-          # Create user account
           New-LocalUser -Name $Username -Password$SecurePassword -FullName "Cloud Administrator" -Description "RDP Access User" -AccountNeverExpires
           
-          # Add user to required privilege groups
           Add-LocalGroupMember -Group "Administrators" -Member $Username
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username
 
-          Write-Host "Created user: $Username"
+          Write-Host "Successfully created user: $Username"
 
       - name: Install & Configure Tailscale
         shell: powershell
         run: |
-          # Download and install Tailscale MSI silently
           $InstallerPath = "$env:TEMP\tailscale.msi"
           Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" -OutFile $InstallerPath -UseBasicParsing
           Start-Process msiexec.exe -ArgumentList "/i `"$InstallerPath`" /quiet /norestart" -Wait
           Remove-Item $InstallerPath -Force
 
-          # Authenticate node to Tailscale network
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname="win2025-$env:GITHUB_RUN_ID"
 
-          # Retrieve Tailscale IP address
           $TailscaleIP =$null
           for ($i = 0; $i -lt 10; $i++) {
               $TailscaleIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
@@ -79,7 +73,6 @@ jobs:
           Write-Host " Password   : WinServer#2026!"
           Write-Host "========================================================`n"
 
-          # Persistent loop to maintain the runner session
           while ($true) {
               Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Session active. Listening on $env:TS_IP:3389"
               Start-Sleep -Seconds 300
