@@ -22,20 +22,12 @@ jobs:
           Restart-Service -Name TermService -Force
 
       - name: Create Administrative User
-        shell: powershell
+        shell: cmd
         run: |
-          $Username = "CloudAdmin"
-          $Password = "WinServer#2026!"
-          
-          # Space fixed between command and argument
-          $SecurePassword = ConvertTo-SecureString -String$Password -AsPlainText -Force
-
-          New-LocalUser -Name $Username -Password$SecurePassword -FullName "Cloud Administrator" -Description "RDP Access User" -AccountNeverExpires
-          
-          Add-LocalGroupMember -Group "Administrators" -Member $Username
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username
-
-          Write-Host "Successfully created user: $Username"
+          net user CloudAdmin "WinServer#2026!" /add /y
+          net localgroup Administrators CloudAdmin /add
+          net localgroup "Remote Desktop Users" CloudAdmin /add
+          echo User created successfully.
 
       - name: Install & Configure Tailscale
         shell: powershell
